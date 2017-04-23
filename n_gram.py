@@ -45,17 +45,13 @@ class N_Gram(object):
             gamma = self.gamma(context)
             p = self.weight(event=event, context=context[1:])
             # print("<-- weight({}|{})".format(event, context))
-            try:
+            if gamma == 0:
+                return p
+            else:
                 return gamma * (
                     self.count(event=event, context=context) /
                     self.count(context=context)
                 ) + (1 - gamma) * p
-            except ZeroDivisionError:
-                # I don't know how to deal with the situation where the given context
-                # was not observed before. It leads to division by zero but it's not
-                # explained in the paper as far as I understand.
-                raise UserWarning("Don't know how to solve that case?!")
-                return (1 - gamma) * p
 
     def distribution(self, context):
         """compute normalized probability distribution over all possible events"""
@@ -123,11 +119,13 @@ class N_Gram(object):
 
 if __name__ == '__main__':
     songs = [
+        # [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3],
         [62, 69, 69, 71, 71, 69, 67, 66, 62, 69, 69, 71, 71, 69, 66, 62, 69, 69, 71, 71, 69, 67, 66, 74, 74, 69, 66, 74, 74, 69, 66],
         [55, 60, 60, 60, 60, 57, 55, 57, 59, 60, 55, 60, 60, 60, 60, 60, 58, 57, 55, 57, 57, 57, 55, 53, 52, 57, 60, 59, 57, 56, 57],
         [65, 65, 69, 72, 74, 72, 69, 72, 70, 69, 67, 65, 65, 65, 69, 72, 74, 72, 69, 72, 70, 69, 67, 65, 72, 72, 70, 69, 72, 70, 69, 72, 72, 74, 74, 72, 70, 69, 72, 72, 72, 69, 77, 72, 72, 72, 69, 72, 72, 65],
         [62, 69, 69, 71, 71, 69, 67, 66, 62, 69, 69, 71, 71, 69, 66, 62, 69, 69, 71, 71, 69, 67, 66, 62, 69, 69, 71, 71, 69, 66]
         ]
+    # alphabet = [1, 2, 3]
     alphabet = [52, 53, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79]
     event_idx = {}
     for idx, event in enumerate(alphabet):
@@ -139,12 +137,13 @@ if __name__ == '__main__':
         song = np.array(song)
         song_cross_entropy = 0
         n_gram = N_Gram(alphabet=alphabet)
-        for time in range(1, len(song)):
-            context = song[0:time-1]
-            print(context)
+        for time in range(0, len(song)):
+            context = song[0:time]
             n_gram.update(context, include_shortened=True, include_earlier=False)
             dist = n_gram.distribution(context)
-            song_cross_entropy -= np.log2(dist[event_idx[song[time]]])
+            p = dist[event_idx[song[time]]]
+            song_cross_entropy -= np.log2(p)
+            print("{} ({}): {}".format(song[time], np.around(p, 2), context))
         corpus_cross_entropy += song_cross_entropy
         song_cross_entropy /= len(song)
         n_events_in_corpus += len(song)
